@@ -8,9 +8,9 @@ from typing import Optional
 
 import typer
 
-from attire_verification.models import RegionScores, Status, VerifyResult
+from attire_verification.models import PoloMatch, RegionScores, Status, VerifyResult
 from attire_verification.pose_cropper import CropResult, PoseCropper
-from attire_verification.rules import MIN_CONFIDENCE, MIN_MARGIN, apply_rules
+from attire_verification.rules import MIN_CONFIDENCE, MIN_MARGIN, POLO_MATCH_THRESHOLD, apply_rules
 from attire_verification.siglip_scorer import FashionSigLIPScorer
 
 app = typer.Typer(
@@ -32,10 +32,10 @@ def _get_pose_cropper() -> PoseCropper:
     return _pose_cropper
 
 
-def _get_scorer() -> FashionSigLIPScorer:
+def _get_scorer(polo_refs: Path | None = None) -> FashionSigLIPScorer:
     global _scorer
     if _scorer is None:
-        _scorer = FashionSigLIPScorer()
+        _scorer = FashionSigLIPScorer(polo_refs=polo_refs)
     return _scorer
 
 
@@ -50,6 +50,8 @@ def run_verify(
     *,
     min_confidence: float = MIN_CONFIDENCE,
     min_margin: float = MIN_MARGIN,
+    polo_match_threshold: float = POLO_MATCH_THRESHOLD,
+    polo_refs: Path | None = None,
     debug_crops: Path | None = None,
 ) -> VerifyResult:
     """Run the full verify pipeline on a single image."""
@@ -63,9 +65,17 @@ def run_verify(
     if debug_crops is not None:
         _save_debug_crops(pose_out.crops, debug_crops)
 
-    scorer = _get_scorer()
+    scorer = _get_scorer(polo_refs)
+    upper_crop = pose_out.crops["upper"]
+    polo_score = scorer.match_official_polo(upper_crop)
+    polo_match = PoloMatch(
+        score=round(polo_score, 4),
+        threshold=polo_match_threshold,
+        matched=polo_score >= polo_match_threshold,
+        refs=scorer.polo_ref_count,
+    )
     regions = RegionScores(
-        upper=scorer.score_region(pose_out.crops["upper"], "upper"),
+        upper=scorer.score_region(upper_crop, "upper"),
         lower=scorer.score_region(pose_out.crops["lower"], "lower"),
         feet=scorer.score_region(pose_out.crops["feet"], "feet"),
         chest=scorer.score_region(pose_out.crops["chest"], "chest"),
@@ -75,9 +85,12 @@ def run_verify(
         regions,
         min_confidence=min_confidence,
         min_margin=min_margin,
+        polo_match_score=polo_score,
+        polo_match_threshold=polo_match_threshold,
         image_path=str(image),
     )
     result.pose = pose_out.pose
+    result.poloMatch = polo_match
     return result
 
 
@@ -88,6 +101,8 @@ def _print_result(result: VerifyResult, pretty: bool) -> None:
         data.pop("expected", None)
     if data.get("match") is None:
         data.pop("match", None)
+    if data.get("poloMatch") is None:
+        data.pop("poloMatch", None)
     if pretty:
         typer.echo(json.dumps(data, indent=2))
     else:
@@ -118,12 +133,26 @@ def verify_cmd(
     min_margin: float = typer.Option(
         MIN_MARGIN, "--min-margin", help="Minimum top1-top2 score margin"
     ),
+    polo_match_threshold: float = typer.Option(
+        POLO_MATCH_THRESHOLD,
+        "--polo-match-threshold",
+        help="Min cosine similarity vs official polo reference crops",
+    ),
+    polo_refs: Optional[Path] = typer.Option(
+        None,
+        "--polo-refs",
+        exists=True,
+        file_okay=False,
+        help="Folder of official-polo upper-body reference JPEGs",
+    ),
 ) -> None:
     """Verify attire in a single full-body photo. Exit 0 if PASSED, else 1."""
     result = run_verify(
         image,
         min_confidence=min_confidence,
         min_margin=min_margin,
+        polo_match_threshold=polo_match_threshold,
+        polo_refs=polo_refs,
         debug_crops=debug_crops,
     )
     _print_result(result, pretty)
@@ -136,6 +165,12 @@ def batch_cmd(
     output: Path = typer.Option(..., "--output", help="JSONL output path"),
     min_confidence: float = typer.Option(MIN_CONFIDENCE, "--min-confidence"),
     min_margin: float = typer.Option(MIN_MARGIN, "--min-margin"),
+    polo_match_threshold: float = typer.Option(
+        POLO_MATCH_THRESHOLD, "--polo-match-threshold"
+    ),
+    polo_refs: Optional[Path] = typer.Option(
+        None, "--polo-refs", exists=True, file_okay=False
+    ),
 ) -> None:
     """Batch-evaluate images under a directory; write JSONL + accuracy summary."""
     images = sorted(
@@ -161,6 +196,8 @@ def batch_cmd(
                 img_path,
                 min_confidence=min_confidence,
                 min_margin=min_margin,
+                polo_match_threshold=polo_match_threshold,
+                polo_refs=polo_refs,
             )
             expected = _infer_expected(img_path)
             result.expected = expected

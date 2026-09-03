@@ -12,6 +12,7 @@ from attire_verification.siglip_scorer import (
     LETTERBOX_SIZE,
     MAX_CROP_SIDE,
     UPPER_SIZE,
+    iter_polo_ref_images,
     prepare_crop,
 )
 
@@ -93,3 +94,12 @@ def test_prepare_crop_downscales_large_non_upper():
 def test_prepare_crop_canonical_upper_size():
     big = Image.new("RGB", (569, 877), (220, 220, 220))
     assert prepare_crop(big, "upper").size == UPPER_SIZE
+
+
+def test_iter_polo_ref_images_skips_non_images(tmp_path):
+    (tmp_path / "ctg3_upper.jpg").write_bytes(b"x")
+    (tmp_path / "notes.txt").write_text("skip")
+    (tmp_path / "nested").mkdir()
+    paths = iter_polo_ref_images(tmp_path)
+    assert [p.name for p in paths] == ["ctg3_upper.jpg"]
+    assert iter_polo_ref_images(tmp_path / "missing") == []

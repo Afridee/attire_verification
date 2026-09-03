@@ -1,13 +1,17 @@
 """Fixed label sets for FashionSigLIP zero-shot scoring."""
 
+# Visual descriptions — FashionSigLIP has no notion of "official" vs "non-official".
+OFFICIAL_POLO_LABEL = "black polo shirt with purple sleeve trim"
+COLORED_POLO_LABEL = "colored polo shirt"
+
 UPPER_LABELS = [
     "white formal button-down shirt",
     "light blue formal button-down shirt",
-    "official company polo shirt",
+    OFFICIAL_POLO_LABEL,
     "casual t-shirt",
     "striped t-shirt",
     "plaid or checkered shirt",
-    "non-official colored polo shirt",
+    COLORED_POLO_LABEL,
 ]
 
 LOWER_LABELS = [

@@ -49,11 +49,21 @@ class RegionScores(BaseModel):
     chest: RegionScore | None = None
 
 
+class PoloMatch(BaseModel):
+    """Image-to-image similarity vs bundled official-polo reference crops."""
+
+    score: float
+    threshold: float
+    matched: bool
+    refs: int = 0
+
+
 class VerifyResult(BaseModel):
     status: Status
     failReasons: list[str] = Field(default_factory=list)
     imagePath: str | None = None
     regions: RegionScores | None = None
     pose: PoseInfo | None = None
+    poloMatch: PoloMatch | None = None
     expected: str | None = None  # batch mode only
     match: bool | None = None  # batch mode only

@@ -13,6 +13,8 @@ from attire_verification.labels import REGION_LABELS
 from attire_verification.models import RegionScore
 
 MODEL_ID = "hf-hub:Marqo/marqo-fashionSigLIP"
+DEFAULT_POLO_REFS_DIR = Path(__file__).resolve().parent / "refs" / "official_polo"
+REF_IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp"}
 
 # FashionSigLIP stretches every crop to 224×224. Tall trouser/feet strips then
 # look like a smear; huge phone originals also over-emphasize badge/texture.
@@ -65,10 +67,19 @@ def prepare_crop(crop_pil: Image.Image, region: str | None = None) -> Image.Imag
     return im
 
 
+def iter_polo_ref_images(ref_dir: Path) -> list[Path]:
+    """Sorted image paths in an official-polo reference folder."""
+    if not ref_dir.is_dir():
+        return []
+    return sorted(
+        p for p in ref_dir.iterdir() if p.is_file() and p.suffix.lower() in REF_IMAGE_SUFFIXES
+    )
+
+
 class FashionSigLIPScorer:
     """Lazy-loaded FashionSigLIP scorer with cached text embeddings."""
 
-    def __init__(self) -> None:
+    def __init__(self, polo_refs: Path | None = None) -> None:
         import open_clip
 
         _load_hf_token()
@@ -82,12 +93,40 @@ class FashionSigLIPScorer:
         for region, labels in REGION_LABELS.items():
             self._cache_labels(region, labels)
 
+        self._polo_ref_paths = iter_polo_ref_images(polo_refs or DEFAULT_POLO_REFS_DIR)
+        self._polo_ref_embeds = self._encode_polo_refs(self._polo_ref_paths)
+
     def _cache_labels(self, region: str, labels: list[str]) -> None:
         tokens = self.tokenizer(labels).to(self.device)
         with torch.no_grad():
             embeds = self.model.encode_text(tokens, normalize=True)
         self._text_embeds[region] = embeds
         self._labels[region] = labels
+
+    def _encode_image(self, crop_pil: Image.Image, region: str | None = None) -> torch.Tensor:
+        image = self.preprocess(prepare_crop(crop_pil, region)).unsqueeze(0).to(self.device)
+        with torch.no_grad():
+            return self.model.encode_image(image, normalize=True).squeeze(0)
+
+    def _encode_polo_refs(self, paths: list[Path]) -> torch.Tensor | None:
+        if not paths:
+            return None
+        embeds = []
+        for path in paths:
+            with Image.open(path) as im:
+                embeds.append(self._encode_image(im.convert("RGB"), "upper"))
+        return torch.stack(embeds)
+
+    @property
+    def polo_ref_count(self) -> int:
+        return len(self._polo_ref_paths)
+
+    def match_official_polo(self, crop_pil: Image.Image) -> float:
+        """Max cosine similarity of an upper crop vs official-polo reference embeddings."""
+        if self._polo_ref_embeds is None:
+            return 0.0
+        feat = self._encode_image(crop_pil, "upper")
+        return float((feat @ self._polo_ref_embeds.T).max().item())
 
     def score_crop(self, crop_pil: Image.Image, labels: list[str]) -> RegionScore:
         """Score a crop against an arbitrary label list (encodes text each call)."""
@@ -115,11 +154,9 @@ class FashionSigLIPScorer:
         """Score a crop using cached embeddings for a named region."""
         labels = self._labels[region]
         text_features = self._text_embeds[region]
-        image = self.preprocess(prepare_crop(crop_pil, region)).unsqueeze(0).to(self.device)
-        with torch.no_grad():
-            image_features = self.model.encode_image(image, normalize=True)
-            sims = (100.0 * image_features @ text_features.T).squeeze(0)
-            probs = F.softmax(sims, dim=-1)
+        image_features = self._encode_image(crop_pil, region).unsqueeze(0)
+        sims = (100.0 * image_features @ text_features.T).squeeze(0)
+        probs = F.softmax(sims, dim=-1)
 
         scores = {label: float(probs[i].item()) for i, label in enumerate(labels)}
         ranked = sorted(scores.items(), key=lambda kv: kv[1], reverse=True)

@@ -4,10 +4,14 @@ from __future__ import annotations
 
 from enum import Enum
 
+from attire_verification.labels import COLORED_POLO_LABEL, OFFICIAL_POLO_LABEL
 from attire_verification.models import RegionScore, RegionScores, Status, VerifyResult
 
 MIN_CONFIDENCE = 0.55
 MIN_MARGIN = 0.08
+# Cosine vs official-polo reference crops. Same shirt in different photos
+# scored ~0.88–0.92; other garments ~0.68–0.78 on the sample set.
+POLO_MATCH_THRESHOLD = 0.85
 
 
 class ShirtType(str, Enum):
@@ -36,11 +40,11 @@ class FootwearType(str, Enum):
 SHIRT_LABEL_MAP: dict[str, ShirtType] = {
     "white formal button-down shirt": ShirtType.WHITE_FORMAL,
     "light blue formal button-down shirt": ShirtType.LIGHT_BLUE_FORMAL,
-    "official company polo shirt": ShirtType.OFFICIAL_POLO,
+    OFFICIAL_POLO_LABEL: ShirtType.OFFICIAL_POLO,
     "casual t-shirt": ShirtType.CASUAL_TEE,
     "striped t-shirt": ShirtType.STRIPED,
     "plaid or checkered shirt": ShirtType.PLAID,
-    "non-official colored polo shirt": ShirtType.NON_OFFICIAL_POLO,
+    COLORED_POLO_LABEL: ShirtType.NON_OFFICIAL_POLO,
 }
 
 TROUSER_LABEL_MAP: dict[str, TrouserType] = {
@@ -82,6 +86,8 @@ def apply_rules(
     *,
     min_confidence: float = MIN_CONFIDENCE,
     min_margin: float = MIN_MARGIN,
+    polo_match_score: float | None = None,
+    polo_match_threshold: float = POLO_MATCH_THRESHOLD,
     image_path: str | None = None,
 ) -> VerifyResult:
     """Apply unified dress-code rules to region scores."""
@@ -98,6 +104,11 @@ def apply_rules(
     feet = regions.feet
 
     shirt = SHIRT_LABEL_MAP.get(upper.topLabel)
+    polo_matched = (
+        polo_match_score is not None and polo_match_score >= polo_match_threshold
+    )
+    if polo_matched:
+        shirt = ShirtType.OFFICIAL_POLO
     trouser = TROUSER_LABEL_MAP.get(lower.topLabel)
     footwear = FOOTWEAR_LABEL_MAP.get(feet.topLabel)
 
@@ -136,8 +147,9 @@ def apply_rules(
             regions=regions,
         )
 
-    # Confidence / margin gates
-    scored_regions = [upper, lower, feet]
+    # Confidence / margin gates. Image-to-image polo match replaces the upper
+    # text scores, which are often split between similar polo prompts.
+    scored_regions = [lower, feet] if polo_matched else [upper, lower, feet]
     for region in scored_regions:
         if region.topScore < min_confidence:
             return VerifyResult(

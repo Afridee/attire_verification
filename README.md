@@ -3,7 +3,7 @@
 Offline eval CLI that checks full-body BR attire photos:
 
 1. MediaPipe Pose framing gate (visible nose + ankles, min person pixel height) + person-centric upper / lower / feet / chest crops  
-2. Marqo FashionSigLIP zero-shot scoring per crop  
+2. Marqo FashionSigLIP zero-shot scoring per crop, plus image-to-image match of the upper crop against official black-polo reference photos  
 3. Unified dress-code rule engine → `PASSED` / `FAILED` / `UNCERTAIN` / `REJECTED`
 
 Not a production API — local eval only.
@@ -45,6 +45,8 @@ Flags:
 | `--debug-crops DIR` | Save `upper.jpg` / `lower.jpg` / `feet.jpg` / `chest.jpg` |
 | `--min-confidence F` | Default `0.55` |
 | `--min-margin F` | Default `0.08` (top1 − top2) |
+| `--polo-match-threshold F` | Default `0.85` (cosine vs official polo refs) |
+| `--polo-refs DIR` | Override bundled official-polo upper crops |
 
 ### Batch folder eval
 
@@ -76,6 +78,8 @@ Writes one JSON object per line to `--output` and prints an accuracy summary to 
 | `FAILED` | Clear violation (sandals, casual shirt, wrong trousers, etc.) |
 | `UNCERTAIN` | Low confidence / low margin / borderline footwear (sneakers) |
 | `REJECTED` | Bad framing (not full body) — retake, not an attire fail |
+
+Official polo is the **black polo with purple sleeve trim**. The upper crop is scored against that visual label, then compared to bundled reference crops (`src/attire_verification/refs/official_polo/`). Cosine ≥ `0.85` promotes the shirt to official polo even if the text labels are split.
 
 ## Sample photos
 
