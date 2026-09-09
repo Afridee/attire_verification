@@ -4,7 +4,7 @@ Offline eval CLI that checks full-body BR attire photos:
 
 1. MediaPipe Pose framing gate (visible nose + ankles, min person pixel height) + person-centric upper / lower / feet / chest crops  
 2. Marqo FashionSigLIP zero-shot scoring per crop, plus image-to-image match of the upper crop against official black-polo reference photos  
-3. Unified dress-code rule engine → `PASSED` / `FAILED` / `UNCERTAIN` / `REJECTED`
+3. Unified dress-code rule engine → score `N/100` (25 points each for chest, feet, upper, lower)
 
 Not a production API — local eval only.
 
@@ -30,7 +30,7 @@ uv run python -m attire_verification verify \
   --image "/path/to/photo.jpg"
 
 uv run python -m attire_verification verify \
-  --image photo.jpg --pretty
+  --image photo.jpg --role BR --pretty
 
 uv run python -m attire_verification verify \
   --image photo.jpg --debug-crops ./debug/
@@ -47,6 +47,7 @@ Flags:
 | `--min-margin F` | Default `0.08` (top1 − top2) |
 | `--polo-match-threshold F` | Default `0.85` (cosine vs official polo refs) |
 | `--polo-refs DIR` | Override bundled official-polo upper crops |
+| `--role ROLE` | Staff role (default `BR`). `BR` and `BR_SUP` require a visible ID badge |
 
 ### Batch folder eval
 
@@ -58,8 +59,8 @@ uv run python -m attire_verification batch \
 
 Recursively finds `*.jpg` / `*.jpeg` / `*.png`. Ground truth is inferred from parent folder name:
 
-- `Right Attire` → expected `PASSED`
-- `Wrong Attire` → expected `FAILED`
+- `Right Attire` → expected `100/100`
+- `Wrong Attire` → expected `<100`
 
 Writes one JSON object per line to `--output` and prints an accuracy summary to stdout.
 
@@ -67,17 +68,23 @@ Writes one JSON object per line to `--output` and prints an accuracy summary to 
 
 | Code | Meaning |
 |------|---------|
-| `0` | `PASSED` |
-| `1` | `FAILED`, `UNCERTAIN`, or `REJECTED` |
+| `0` | `100/100` (all four regions passed) |
+| `1` | Score below 100, or framing rejected (`0/100` with `incomplete_body_in_frame`) |
 
-## Status values
+## Score
 
-| Status | Meaning |
-|--------|---------|
-| `PASSED` | Meets unified dress code |
-| `FAILED` | Clear violation (sandals, casual shirt, wrong trousers, etc.) |
-| `UNCERTAIN` | Low confidence / low margin / borderline footwear (sneakers) |
-| `REJECTED` | Bad framing (not full body) — retake, not an attire fail |
+Each region is worth **25 points**. A region scores 25 only when it clearly meets dress code; violations, sneakers, low confidence, and missing crops score 0.
+
+| Region | Pass (25) | Zero (0) |
+|--------|-----------|----------|
+| **upper** | Formal shirt or official polo (text or ref match ≥ 0.85) | Casual/striped/plaid, non-official polo, low confidence |
+| **lower** | Black or navy trousers | Beige/tan chinos, low confidence |
+| **feet** | Closed shoes or loafers | Sandals, sneakers, low confidence |
+| **chest** | Visible ID badge (`BR` / `BR_SUP`); auto-pass for other roles | Missing badge (BR / BR_SUP), low confidence |
+
+Example: chest, feet, and lower pass but upper fails → `"score": "75/100"`.
+
+Framing failures (not full body) return `"score": "0/100"` with `failReasons: ["incomplete_body_in_frame"]` — retake, not an attire fail.
 
 Official polo is the **black polo with purple sleeve trim**. The upper crop is scored against that visual label, then compared to bundled reference crops (`src/attire_verification/refs/official_polo/`). Cosine ≥ `0.85` promotes the shirt to official polo even if the text labels are split.
 

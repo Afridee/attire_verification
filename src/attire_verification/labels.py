@@ -27,9 +27,12 @@ FEET_LABELS = [
     "sandals or slides",
 ]
 
+ID_BADGE_VISIBLE_LABEL = "blue lanyard with ID badge visible"
+NO_ID_BADGE_LABEL = "no ID badge visible"
+
 CHEST_LABELS = [
-    "blue lanyard with ID badge visible",
-    "no ID badge visible",
+    ID_BADGE_VISIBLE_LABEL,
+    NO_ID_BADGE_LABEL,
 ]
 
 REGION_LABELS: dict[str, list[str]] = {

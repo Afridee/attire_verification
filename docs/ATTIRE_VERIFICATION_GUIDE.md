@@ -7,16 +7,16 @@ This document explains how the offline BR attire verification pipeline works: th
 Verification runs in three stages:
 
 ```
-Photo → PoseCropper → FashionSigLIP (+ polo ref match) → apply_rules → Verdict
+Photo → PoseCropper → FashionSigLIP (+ polo ref match) → apply_rules → Score
               ↓
-         REJECTED (stops early if framing fails)
+         0/100 (stops early if framing fails)
 ```
 
 | Stage | Component | Output |
 |-------|-----------|--------|
-| 1 | `PoseCropper` | Region crops or `REJECTED` |
+| 1 | `PoseCropper` | Region crops or `0/100` (`incomplete_body_in_frame`) |
 | 2 | `FashionSigLIPScorer` | Label probabilities per region + polo similarity score |
-| 3 | `apply_rules()` | `PASSED` / `FAILED` / `UNCERTAIN` |
+| 3 | `apply_rules()` | `score` `N/100` (25 per region) |
 
 Stage 2 now has **two scoring paths for the upper body**:
 
@@ -30,6 +30,7 @@ Run the full pipeline via CLI:
 ```bash
 uv run python -m attire_verification verify \
   --image "/path/to/photo.jpg" \
+  --role BR \
   --pretty \
   --debug-crops ./debug/
 ```
@@ -47,19 +48,23 @@ The `--debug-crops` flag saves `upper.jpg`, `lower.jpg`, `feet.jpg`, and `chest.
 | `--min-margin F` | `0.08` | Minimum top1 − top2 margin |
 | `--polo-match-threshold F` | `0.85` | Min cosine similarity vs official polo refs |
 | `--polo-refs DIR` | bundled | Override official-polo reference folder |
+| `--role ROLE` | `BR` | Staff role. `BR` and `BR_SUP` require a visible ID badge |
 
 ---
 
-## Status outcomes
+## Score outcomes
 
-Four possible final statuses:
+Each of **chest**, **feet**, **upper**, and **lower** is worth **25 points**. The JSON `score` is `"N/100"`. A region earns 25 only when it clearly meets dress code.
 
-| Status | Meaning | Typical cause |
-|--------|---------|----------------|
-| **REJECTED** | Photo unsuitable for verification | Bad framing, no pose, unreadable image |
-| **FAILED** | Clear dress-code violation | Sandals, casual shirt, wrong polo, chinos, etc. |
-| **UNCERTAIN** | Model not confident enough, or borderline item | Low scores, sneakers |
-| **PASSED** | Compliant attire with confident scores | Formal shirt or official polo + black/navy trousers + closed shoes |
+| Score | Meaning | Typical cause |
+|-------|---------|----------------|
+| **0/100** (framing) | Photo unsuitable for verification | Bad framing, no pose, unreadable image (`incomplete_body_in_frame`) |
+| **0–75/100** | One or more regions did not pass | Sandals, casual shirt, wrong polo, chinos, missing ID badge, sneakers, low confidence |
+| **100/100** | All four regions passed | Formal shirt or official polo + black/navy trousers + closed shoes (+ badge for BR / BR_SUP) |
+
+Example: chest, feet, and lower pass but upper fails → `"score": "75/100"`.
+
+JSON also includes `regionPoints` (`upper` / `lower` / `feet` / `chest`, each `0` or `25`).
 
 JSON output may also include a `poloMatch` block when scoring completes:
 
@@ -125,7 +130,7 @@ Extra background is fine — the person does **not** need to fill most of the fr
 6. Compute region boxes with `_region_boxes()`
 7. Return `CropResult` with PIL crops and boxes mapped to original image coordinates
 
-Early exits all return `Status.REJECTED` with `failReasons: ["incomplete_body_in_frame"]`:
+Early exits all return `score: "0/100"` with `failReasons: ["incomplete_body_in_frame"]`:
 
 - Unreadable image
 - No pose detected
@@ -241,13 +246,14 @@ When `polo_matched` is true:
 - **Upper-region confidence/margin gates are skipped** (text scores for similar polo prompts are often split)
 - Lower and feet regions still require confidence ≥ 0.55 and margin ≥ 0.08
 
-### Decision priority
+### Per-region scoring
+
+Each region is judged independently (no whole-photo short-circuit):
 
 ```
-1. Auto FAIL   → clear violations (takes precedence)
-2. UNCERTAIN   → sneakers, low confidence, low margin
-3. Auto PASS   → all regions acceptable and confident
-4. UNCERTAIN   → unknown / unmatched labels (fallback)
+Pass (25)  → region meets dress code with confident scores
+Zero (0)   → clear violation, sneakers, low confidence/margin, missing crop, or unknown label
+Total      → upper + lower + feet + chest  (max 100)
 ```
 
 ### Thresholds
@@ -260,13 +266,23 @@ When `polo_matched` is true:
 
 Margin = `topScore - secondScore`.
 
+### Roles
+
+Staff role strings match the mobile `RoleInfo` constants. Default is `BR`.
+
+| Role | ID badge required |
+|------|-------------------|
+| `BR`, `BR_SUP` | Yes — chest crop must score `blue lanyard with ID badge visible` to earn 25 |
+| All other roles (`OM`, `FC`, `DXO`, …) | No — chest auto-passes (25) even without a badge |
+
 ### Allowed vs forbidden
 
-| Region | Pass | Fail | Uncertain |
-|--------|------|------|-----------|
-| **Shirt** | White formal, light blue formal, official polo (text or ref match) | Casual tee, striped, plaid, colored polo (no ref match) | — |
-| **Trousers** | Black formal, dark navy | Beige/tan chinos | — |
-| **Feet** | Closed shoes, loafers | Sandals/slides | Sneakers |
+| Region | Pass (25) | Zero (0) |
+|--------|-----------|----------|
+| **Shirt** | White formal, light blue formal, official polo (text or ref match) | Casual tee, striped, plaid, colored polo (no ref match), low confidence |
+| **Trousers** | Black formal, dark navy | Beige/tan chinos, low confidence |
+| **Feet** | Closed shoes, loafers | Sandals/slides, sneakers, low confidence |
+| **Chest** (BR / BR_SUP only) | Blue lanyard with ID badge visible | No ID badge visible, missing crop, low badge confidence |
 
 ### Fail reasons
 
@@ -277,40 +293,32 @@ Margin = `topScore - secondScore`.
 | `open_footwear` | Sandals or slides |
 | `wrong_trousers` | Beige or tan chinos |
 | `borderline_footwear` | White sneakers (never auto-pass in v1) |
-| `low_confidence` | Score or margin below threshold, or missing region |
+| `missing_id_badge` | BR / BR_SUP and chest top label is no ID badge |
+| `low_confidence` | Score or margin below threshold, or missing region (including missing chest when badge is required) |
 | `incomplete_body_in_frame` | Pose/framing failed (from `PoseCropper` only) |
 
 ### Core rule logic
 
 ```python
-# Resolve shirt from text label, then optionally override via ref match
+# Each region independently earns 0 or 25
+points = RegionPoints()
+
+# Shirt: resolve from text label, then optionally override via ref match
 shirt = SHIRT_LABEL_MAP.get(upper.topLabel)
 if polo_match_score >= polo_match_threshold:
     shirt = ShirtType.OFFICIAL_POLO
-
-# Auto FAIL checks (clear violations take precedence)
-if shirt in FAIL_SHIRTS:
+if shirt in PASS_SHIRTS and (polo_matched or confident(upper)):
+    points.upper = 25
+elif shirt in FAIL_SHIRTS:
     fail_reasons.append("casual_shirt" or "non_official_polo")
+else:
+    fail_reasons.append("low_confidence")
 
-if footwear == FootwearType.SANDALS:
-    fail_reasons.append("open_footwear")
+# Feet / trousers follow the same pass-or-zero pattern
+# Sneakers never earn feet points (borderline_footwear)
+# Chest: BR / BR_SUP need a visible badge; other roles auto-pass chest
 
-if trouser == TrouserType.BEIGE_CHINOS:
-    fail_reasons.append("wrong_trousers")
-
-# Sneakers are borderline — never auto-pass
-if footwear == FootwearType.SNEAKERS:
-    return UNCERTAIN, ["borderline_footwear"]
-
-# Confidence / margin gates — skip upper when polo ref matched
-scored_regions = [lower, feet] if polo_matched else [upper, lower, feet]
-for region in scored_regions:
-    if topScore < 0.55 or margin < 0.08:
-        return UNCERTAIN, ["low_confidence"]
-
-# Auto PASS
-if shirt in PASS_SHIRTS and trouser in PASS_TROUSERS and footwear in PASS_FEET:
-    return PASSED
+score = f"{points.upper + points.lower + points.feet + points.chest}/100"
 ```
 
 ---
@@ -321,7 +329,7 @@ if shirt in PASS_SHIRTS and trouser in PASS_TROUSERS and footwear in PASS_FEET:
 def run_verify(image, ...):
     pose_out = cropper.process(image)
     if isinstance(pose_out, VerifyResult):
-        return pose_out  # REJECTED
+        return pose_out  # framing rejected: 0/100
 
     upper_crop = pose_out.crops["upper"]
     polo_score = scorer.match_official_polo(upper_crop)
@@ -337,6 +345,7 @@ def run_verify(image, ...):
         regions,
         polo_match_score=polo_score,
         polo_match_threshold=polo_match_threshold,
+        role=role,
         ...
     )
     result.poloMatch = PoloMatch(score=..., threshold=..., matched=..., refs=...)
@@ -364,20 +373,22 @@ def _score(top: str, top_s: float, second: str, second_s: float) -> RegionScore:
 
 ### Test cases
 
-| Test | Status | Why |
-|------|--------|-----|
-| `test_formal_wear_passes` | **PASSED** | White formal shirt + black trousers + loafers, all confident |
-| `test_official_polo_visual_label_passes` | **PASSED** | Black polo with purple trim label wins text scoring |
-| `test_sandals_and_striped_shirt_fail` | **FAILED** | Striped shirt + sandals → `casual_shirt` + `open_footwear` |
-| `test_beige_chinos_fail` | **FAILED** | Beige chinos → `wrong_trousers` |
-| `test_non_official_polo_fail` | **FAILED** | Colored polo, no ref match → `non_official_polo` |
-| `test_low_confidence_uncertain` | **UNCERTAIN** | Upper score 0.40 < 0.55 |
-| `test_low_margin_uncertain` | **UNCERTAIN** | Top score 0.50 < 0.55 (margin also too low at 0.05) |
-| `test_sneakers_uncertain` | **UNCERTAIN** | Sneakers → `borderline_footwear` |
-| `test_polo_match_promotes_colored_polo` | **PASSED** | Colored polo text label, but `polo_match_score=0.90` promotes to official |
-| `test_polo_match_below_threshold_still_fails` | **FAILED** | Colored polo + ref score 0.70 → `non_official_polo` |
-| `test_polo_match_skips_low_upper_confidence` | **PASSED** | Low upper text scores ignored when ref match succeeds |
-| `test_polo_match_sneakers_still_uncertain` | **UNCERTAIN** | Ref match does not override sneaker borderline rule |
+| Test | Score | Why |
+|------|-------|-----|
+| `test_formal_wear_scores_100` | **100/100** | White formal shirt + black trousers + loafers + badge |
+| `test_official_polo_visual_label_scores_100` | **100/100** | Black polo with purple trim label wins text scoring |
+| `test_sandals_and_striped_shirt_score_50` | **50/100** | Striped shirt + sandals → `casual_shirt` + `open_footwear` |
+| `test_beige_chinos_score_75` | **75/100** | Beige chinos → `wrong_trousers` (lower 0) |
+| `test_non_official_polo_score_75` | **75/100** | Colored polo, no ref match → `non_official_polo` (upper 0) |
+| `test_low_confidence_upper_scores_75` | **75/100** | Upper score 0.40 < 0.55 |
+| `test_low_margin_upper_scores_75` | **75/100** | Top score 0.50 < 0.55 (margin also too low at 0.05) |
+| `test_sneakers_score_75` | **75/100** | Sneakers → `borderline_footwear` (feet 0) |
+| `test_polo_match_promotes_colored_polo` | **100/100** | Colored polo text label, but `polo_match_score=0.90` promotes to official |
+| `test_polo_match_below_threshold_still_zero_upper` | **75/100** | Colored polo + ref score 0.70 → `non_official_polo` |
+| `test_polo_match_skips_low_upper_confidence` | **100/100** | Low upper text scores ignored when ref match succeeds |
+| `test_polo_match_sneakers_still_zero_feet` | **75/100** | Ref match does not override sneaker borderline rule |
+| `test_br_missing_id_badge_scores_75` | **75/100** | Default BR role, chest says no badge |
+| `test_om_scores_100_without_id_badge` | **100/100** | OM does not require a badge (chest auto-pass) |
 
 Run rule tests only (no GPU / MediaPipe):
 
@@ -416,7 +427,7 @@ Pinned to 0.10.21 because newer MediaPipe Tasks builds can abort on macOS Metal.
 | **NumPy** | Array handling for pose and images |
 | **PyTorch** | Runs FashionSigLIP inference |
 | **open-clip-torch** | Loads and runs the SigLIP model |
-| **Pydantic** | Result schemas (`VerifyResult`, `RegionScore`, `PoloMatch`, `Status`) |
+| **Pydantic** | Result schemas (`VerifyResult`, `RegionScore`, `RegionPoints`, `PoloMatch`) |
 | **Typer** | CLI entry point |
 | **pytest** | Unit tests |
 | **uv** | Dependency and environment management |
@@ -434,7 +445,7 @@ Pinned to 0.10.21 because newer MediaPipe Tasks builds can abort on macOS Metal.
 
 ## Quick reference cheat sheet
 
-### Pose cropper (→ REJECTED)
+### Pose cropper (→ 0/100)
 
 | Check | Threshold |
 |-------|-----------|
@@ -444,12 +455,12 @@ Pinned to 0.10.21 because newer MediaPipe Tasks builds can abort on macOS Metal.
 
 ### Dress code rules
 
-| Status | When |
-|--------|------|
-| **FAILED** | Striped/plaid/casual tee, colored polo (no ref match), sandals, beige chinos |
-| **UNCERTAIN** | Sneakers, low confidence (< 0.55), low margin (< 0.08), missing regions |
-| **PASSED** | Formal shirt or official polo (text or ref match ≥ 0.85) + black/navy trousers + loafers/closed shoes + confident scores |
-| **REJECTED** | Pose/framing failed (only from `PoseCropper`) |
+| Outcome | When |
+|---------|------|
+| **0 for a region** | Striped/plaid/casual tee, colored polo (no ref match), sandals, sneakers, beige chinos, missing ID badge (BR / BR_SUP), low confidence (< 0.55), low margin (< 0.08), missing crop |
+| **25 for a region** | Formal shirt or official polo (text or ref match ≥ 0.85); black/navy trousers; loafers/closed shoes; BR / BR_SUP visible ID badge (other roles auto-pass chest) |
+| **100/100** | All four regions earned 25 |
+| **0/100** (framing) | Pose/framing failed (only from `PoseCropper`) |
 
 ### Official polo decision
 
@@ -457,7 +468,7 @@ Pinned to 0.10.21 because newer MediaPipe Tasks builds can abort on macOS Metal.
 upper crop
     ├── text label: "black polo shirt with purple sleeve trim" → official (if confident)
     ├── text label: "colored polo shirt" + ref score ≥ 0.85 → promoted to official
-    └── text label: "colored polo shirt" + ref score < 0.85 → FAILED (non_official_polo)
+    └── text label: "colored polo shirt" + ref score < 0.85 → upper 0 (`non_official_polo`)
 ```
 
 ---
@@ -469,9 +480,11 @@ upper crop
 | `src/attire_verification/cli.py` | CLI and full pipeline orchestration |
 | `src/attire_verification/pose_cropper.py` | MediaPipe framing gate and region crops |
 | `src/attire_verification/siglip_scorer.py` | FashionSigLIP scoring + polo ref matching |
-| `src/attire_verification/rules.py` | Dress-code rule engine (with polo override) |
+| `src/attire_verification/rules.py` | Dress-code rule engine (with polo override + role badge rules) |
+| `src/attire_verification/roles.py` | Staff roles and which ones require an ID badge |
 | `src/attire_verification/labels.py` | Fixed text labels per region |
-| `src/attire_verification/models.py` | Pydantic schemas (`Status`, `VerifyResult`, `PoloMatch`, etc.) |
+| `src/attire_verification/models.py` | Pydantic schemas (`VerifyResult`, `RegionPoints`, `PoloMatch`, etc.) |
 | `src/attire_verification/refs/official_polo/` | Bundled official-polo upper reference JPEGs |
-| `tests/test_rules.py` | Rule engine unit tests (mock scores + polo match) |
+| `tests/test_rules.py` | Rule engine unit tests (mock scores + polo match + roles) |
+| `tests/test_roles.py` | Role parsing and ID-badge requirement tests |
 | `tests/test_pose_framing.py` | Framing helper unit tests (no MediaPipe) |

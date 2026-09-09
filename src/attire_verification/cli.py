@@ -8,8 +8,14 @@ from typing import Optional
 
 import typer
 
-from attire_verification.models import PoloMatch, RegionScores, Status, VerifyResult
+from attire_verification.models import (
+    PERFECT_SCORE,
+    PoloMatch,
+    RegionScores,
+    VerifyResult,
+)
 from attire_verification.pose_cropper import CropResult, PoseCropper
+from attire_verification.roles import Role, parse_role
 from attire_verification.rules import MIN_CONFIDENCE, MIN_MARGIN, POLO_MATCH_THRESHOLD, apply_rules
 from attire_verification.siglip_scorer import FashionSigLIPScorer
 
@@ -45,6 +51,17 @@ def _save_debug_crops(crops: dict, debug_dir: Path) -> None:
         img.save(debug_dir / f"{name}.jpg", quality=92)
 
 
+def _parse_role_option(
+    _ctx: typer.Context,
+    _param: typer.CallbackParam,
+    value: str,
+) -> str:
+    try:
+        return parse_role(value).value
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+
+
 def run_verify(
     image: Path,
     *,
@@ -53,12 +70,15 @@ def run_verify(
     polo_match_threshold: float = POLO_MATCH_THRESHOLD,
     polo_refs: Path | None = None,
     debug_crops: Path | None = None,
+    role: str = Role.BR.value,
 ) -> VerifyResult:
     """Run the full verify pipeline on a single image."""
+    canonical_role = parse_role(role).value
     cropper = _get_pose_cropper()
     pose_out = cropper.process(image)
 
     if isinstance(pose_out, VerifyResult):
+        pose_out.role = canonical_role
         return pose_out
 
     assert isinstance(pose_out, CropResult)
@@ -88,6 +108,7 @@ def run_verify(
         polo_match_score=polo_score,
         polo_match_threshold=polo_match_threshold,
         image_path=str(image),
+        role=canonical_role,
     )
     result.pose = pose_out.pose
     result.poloMatch = polo_match
@@ -103,10 +124,17 @@ def _print_result(result: VerifyResult, pretty: bool) -> None:
         data.pop("match", None)
     if data.get("poloMatch") is None:
         data.pop("poloMatch", None)
+    if data.get("role") is None:
+        data.pop("role", None)
+    if data.get("regionPoints") is None:
+        data.pop("regionPoints", None)
     if pretty:
         typer.echo(json.dumps(data, indent=2))
     else:
         typer.echo(json.dumps(data))
+
+
+EXPECTED_WRONG = "<100"
 
 
 def _infer_expected(path: Path) -> str | None:
@@ -114,10 +142,14 @@ def _infer_expected(path: Path) -> str | None:
     for parent in path.parents:
         name = parent.name.strip().lower()
         if name == "right attire":
-            return Status.PASSED.value
+            return PERFECT_SCORE
         if name == "wrong attire":
-            return Status.FAILED.value
+            return EXPECTED_WRONG
     return None
+
+
+def _is_rejected(result: VerifyResult) -> bool:
+    return "incomplete_body_in_frame" in result.failReasons
 
 
 @app.command("verify")
@@ -145,8 +177,14 @@ def verify_cmd(
         file_okay=False,
         help="Folder of official-polo upper-body reference JPEGs",
     ),
+    role: str = typer.Option(
+        Role.BR.value,
+        "--role",
+        help="Staff role (BR and BR_SUP require a visible ID badge)",
+        callback=_parse_role_option,
+    ),
 ) -> None:
-    """Verify attire in a single full-body photo. Exit 0 if PASSED, else 1."""
+    """Verify attire in a single full-body photo. Exit 0 if 100/100, else 1."""
     result = run_verify(
         image,
         min_confidence=min_confidence,
@@ -154,9 +192,10 @@ def verify_cmd(
         polo_match_threshold=polo_match_threshold,
         polo_refs=polo_refs,
         debug_crops=debug_crops,
+        role=role,
     )
     _print_result(result, pretty)
-    raise typer.Exit(code=0 if result.status == Status.PASSED else 1)
+    raise typer.Exit(code=0 if result.score == PERFECT_SCORE else 1)
 
 
 @app.command("batch")
@@ -170,6 +209,12 @@ def batch_cmd(
     ),
     polo_refs: Optional[Path] = typer.Option(
         None, "--polo-refs", exists=True, file_okay=False
+    ),
+    role: str = typer.Option(
+        Role.BR.value,
+        "--role",
+        help="Staff role applied to every image (BR and BR_SUP require a visible ID badge)",
+        callback=_parse_role_option,
     ),
 ) -> None:
     """Batch-evaluate images under a directory; write JSONL + accuracy summary."""
@@ -187,8 +232,7 @@ def batch_cmd(
     false_pass = 0
     false_fail = 0
     rejected = 0
-    uncertain = 0
-    scored = 0  # has expected label and not REJECTED
+    scored = 0  # has expected label and not framing-rejected
 
     with output.open("w", encoding="utf-8") as f:
         for img_path in images:
@@ -198,28 +242,26 @@ def batch_cmd(
                 min_margin=min_margin,
                 polo_match_threshold=polo_match_threshold,
                 polo_refs=polo_refs,
+                role=role,
             )
             expected = _infer_expected(img_path)
             result.expected = expected
 
             match: bool | None = None
             if expected is not None:
-                if result.status == Status.REJECTED:
+                if _is_rejected(result):
                     rejected += 1
                     match = False
-                elif result.status == Status.UNCERTAIN:
-                    uncertain += 1
-                    # UNCERTAIN is not a correct prediction of PASSED/FAILED
-                    match = False
-                    scored += 1
                 else:
                     scored += 1
-                    match = result.status.value == expected
+                    perfect = result.score == PERFECT_SCORE
+                    expect_perfect = expected == PERFECT_SCORE
+                    match = perfect == expect_perfect
                     if match:
                         correct += 1
-                    elif result.status == Status.PASSED and expected == Status.FAILED.value:
+                    elif perfect and not expect_perfect:
                         false_pass += 1
-                    elif result.status == Status.FAILED and expected == Status.PASSED.value:
+                    elif not perfect and expect_perfect:
                         false_fail += 1
             result.match = match
             total += 1
@@ -238,7 +280,6 @@ def batch_cmd(
                 "falsePass": false_pass,
                 "falseFail": false_fail,
                 "rejected": rejected,
-                "uncertain": uncertain,
                 "output": str(output),
             },
             indent=2,

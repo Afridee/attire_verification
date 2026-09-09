@@ -2,17 +2,28 @@
 
 from __future__ import annotations
 
-from enum import Enum
 from typing import Any
 
 from pydantic import BaseModel, Field
 
+REGION_POINTS = 25
+MAX_SCORE = 100
+PERFECT_SCORE = f"{MAX_SCORE}/{MAX_SCORE}"
+ZERO_SCORE = f"0/{MAX_SCORE}"
 
-class Status(str, Enum):
-    PASSED = "PASSED"
-    FAILED = "FAILED"
-    UNCERTAIN = "UNCERTAIN"
-    REJECTED = "REJECTED"
+
+def format_score(points: int) -> str:
+    """Format earned points as ``N/100``."""
+    return f"{points}/{MAX_SCORE}"
+
+
+class RegionPoints(BaseModel):
+    """Points earned per region (0 or 25)."""
+
+    upper: int = 0
+    lower: int = 0
+    feet: int = 0
+    chest: int = 0
 
 
 class RegionScore(BaseModel):
@@ -59,11 +70,13 @@ class PoloMatch(BaseModel):
 
 
 class VerifyResult(BaseModel):
-    status: Status
+    score: str
     failReasons: list[str] = Field(default_factory=list)
     imagePath: str | None = None
     regions: RegionScores | None = None
+    regionPoints: RegionPoints | None = None
     pose: PoseInfo | None = None
     poloMatch: PoloMatch | None = None
+    role: str | None = None
     expected: str | None = None  # batch mode only
     match: bool | None = None  # batch mode only
