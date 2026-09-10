@@ -2,29 +2,29 @@
 
 # Visual descriptions — FashionSigLIP has no notion of "official" vs "non-official".
 OFFICIAL_POLO_LABEL = "black polo shirt with purple sleeve trim"
-COLORED_POLO_LABEL = "colored polo shirt"
+NON_FORMAL_SHIRT_LABEL = "casual or non-formal shirt"
+BRIGHT_SHOE_LABEL = "brightly colored or neon shoes"
+CASUAL_TROUSERS_LABEL = "casual trousers"
 
 UPPER_LABELS = [
-    "white formal button-down shirt",
-    "light blue formal button-down shirt",
+    "white formal button-down shirt tucked in",
+    "light blue formal button-down shirt tucked in",
     OFFICIAL_POLO_LABEL,
-    "casual t-shirt",
-    "striped t-shirt",
-    "plaid or checkered shirt",
-    COLORED_POLO_LABEL,
+    NON_FORMAL_SHIRT_LABEL,
 ]
 
 LOWER_LABELS = [
     "black formal trousers",
     "dark navy trousers",
-    "beige or tan chinos",
+    CASUAL_TROUSERS_LABEL,
 ]
 
 FEET_LABELS = [
-    "black formal closed shoes",
-    "black leather loafers",
-    "white sneakers",
+    "formal closed shoes",
+    "leather loafers",
+    "single-color sober sneakers",
     "sandals or slides",
+    BRIGHT_SHOE_LABEL,
 ]
 
 ID_BADGE_VISIBLE_LABEL = "blue lanyard with ID badge visible"

@@ -2,7 +2,13 @@
 
 import pytest
 
-from attire_verification.labels import ID_BADGE_VISIBLE_LABEL, NO_ID_BADGE_LABEL
+from attire_verification.labels import (
+    CASUAL_TROUSERS_LABEL,
+    ID_BADGE_VISIBLE_LABEL,
+    NO_ID_BADGE_LABEL,
+    NON_FORMAL_SHIRT_LABEL,
+    OFFICIAL_POLO_LABEL,
+)
 from attire_verification.models import RegionScore, RegionScores
 from attire_verification.roles import Role
 from attire_verification.rules import apply_rules
@@ -31,19 +37,19 @@ def _formal(
 ) -> RegionScores:
     return RegionScores(
         upper=_score(
-            "white formal button-down shirt", 0.82, "light blue formal button-down shirt", 0.10
+            "white formal button-down shirt tucked in", 0.82, "light blue formal button-down shirt tucked in", 0.10
         ),
         lower=_score("black formal trousers", 0.79, "dark navy trousers", 0.12),
-        feet=_score("black leather loafers", 0.76, "black formal closed shoes", 0.14),
+        feet=_score("leather loafers", 0.76, "formal closed shoes", 0.14),
         chest=_badge() if include_badge and chest is None else chest,
     )
 
 
-def test_sandals_and_striped_shirt_score_50():
+def test_sandals_and_casual_shirt_score_50():
     regions = RegionScores(
-        upper=_score("striped t-shirt", 0.81, "casual t-shirt", 0.12),
+        upper=_score(NON_FORMAL_SHIRT_LABEL, 0.81, "white formal button-down shirt tucked in", 0.12),
         lower=_score("black formal trousers", 0.74, "dark navy trousers", 0.15),
-        feet=_score("sandals or slides", 0.88, "white sneakers", 0.08),
+        feet=_score("sandals or slides", 0.88, "single-color sober sneakers", 0.08),
         chest=_badge(),
     )
     result = apply_rules(regions)
@@ -73,10 +79,10 @@ def test_formal_wear_scores_100():
 def test_official_polo_visual_label_scores_100():
     regions = RegionScores(
         upper=_score(
-            "black polo shirt with purple sleeve trim", 0.82, "colored polo shirt", 0.10
+            OFFICIAL_POLO_LABEL, 0.82, NON_FORMAL_SHIRT_LABEL, 0.10
         ),
         lower=_score("dark navy trousers", 0.79, "black formal trousers", 0.12),
-        feet=_score("black leather loafers", 0.76, "black formal closed shoes", 0.14),
+        feet=_score("leather loafers", 0.76, "formal closed shoes", 0.14),
         chest=_badge(),
     )
     result = apply_rules(regions)
@@ -87,10 +93,10 @@ def test_official_polo_visual_label_scores_100():
 def test_low_confidence_upper_scores_75():
     regions = RegionScores(
         upper=_score(
-            "white formal button-down shirt", 0.40, "light blue formal button-down shirt", 0.30
+            "white formal button-down shirt tucked in", 0.40, "light blue formal button-down shirt tucked in", 0.30
         ),
         lower=_score("black formal trousers", 0.79, "dark navy trousers", 0.12),
-        feet=_score("black leather loafers", 0.76, "black formal closed shoes", 0.14),
+        feet=_score("leather loafers", 0.76, "formal closed shoes", 0.14),
         chest=_badge(),
     )
     result = apply_rules(regions)
@@ -100,29 +106,29 @@ def test_low_confidence_upper_scores_75():
     assert result.failReasons == ["low_confidence"]
 
 
-def test_sneakers_score_75():
+def test_sober_sneakers_score_100():
     regions = RegionScores(
         upper=_score(
-            "white formal button-down shirt", 0.82, "light blue formal button-down shirt", 0.10
+            "white formal button-down shirt tucked in", 0.82, "light blue formal button-down shirt tucked in", 0.10
         ),
         lower=_score("black formal trousers", 0.79, "dark navy trousers", 0.12),
-        feet=_score("white sneakers", 0.70, "black formal closed shoes", 0.15),
+        feet=_score("single-color sober sneakers", 0.70, "formal closed shoes", 0.15),
         chest=_badge(),
     )
     result = apply_rules(regions)
-    assert result.score == "75/100"
+    assert result.score == "100/100"
     assert result.regionPoints is not None
-    assert result.regionPoints.feet == 0
-    assert result.failReasons == ["borderline_footwear"]
+    assert result.regionPoints.feet == 25
+    assert result.failReasons == []
 
 
-def test_beige_chinos_score_75():
+def test_casual_trousers_score_75():
     regions = RegionScores(
         upper=_score(
-            "black polo shirt with purple sleeve trim", 0.80, "white formal button-down shirt", 0.10
+            "black polo shirt with purple sleeve trim", 0.80, "white formal button-down shirt tucked in", 0.10
         ),
-        lower=_score("beige or tan chinos", 0.72, "black formal trousers", 0.15),
-        feet=_score("black formal closed shoes", 0.75, "black leather loafers", 0.12),
+        lower=_score(CASUAL_TROUSERS_LABEL, 0.72, "black formal trousers", 0.15),
+        feet=_score("formal closed shoes", 0.75, "leather loafers", 0.12),
         chest=_badge(),
     )
     result = apply_rules(regions)
@@ -132,29 +138,29 @@ def test_beige_chinos_score_75():
     assert "wrong_trousers" in result.failReasons
 
 
-def test_non_official_polo_score_75():
+def test_non_formal_shirt_score_75():
     regions = RegionScores(
         upper=_score(
-            "colored polo shirt", 0.78, "black polo shirt with purple sleeve trim", 0.12
+            NON_FORMAL_SHIRT_LABEL, 0.78, OFFICIAL_POLO_LABEL, 0.12
         ),
         lower=_score("black formal trousers", 0.79, "dark navy trousers", 0.12),
-        feet=_score("black leather loafers", 0.76, "black formal closed shoes", 0.14),
+        feet=_score("leather loafers", 0.76, "formal closed shoes", 0.14),
         chest=_badge(),
     )
     result = apply_rules(regions)
     assert result.score == "75/100"
     assert result.regionPoints is not None
     assert result.regionPoints.upper == 0
-    assert "non_official_polo" in result.failReasons
+    assert "casual_shirt" in result.failReasons
 
 
 def test_low_margin_upper_scores_75():
     regions = RegionScores(
         upper=_score(
-            "white formal button-down shirt", 0.50, "light blue formal button-down shirt", 0.45
+            "white formal button-down shirt tucked in", 0.52, NON_FORMAL_SHIRT_LABEL, 0.46
         ),
         lower=_score("black formal trousers", 0.79, "dark navy trousers", 0.12),
-        feet=_score("black leather loafers", 0.76, "black formal closed shoes", 0.14),
+        feet=_score("leather loafers", 0.76, "formal closed shoes", 0.14),
         chest=_badge(),
     )
     result = apply_rules(regions)
@@ -162,16 +168,16 @@ def test_low_margin_upper_scores_75():
     assert result.failReasons == ["low_confidence"]
 
 
-def _polo_regions(*, upper_top: str = "colored polo shirt") -> RegionScores:
+def _polo_regions(*, upper_top: str = NON_FORMAL_SHIRT_LABEL) -> RegionScores:
     return RegionScores(
-        upper=_score(upper_top, 0.40, "black polo shirt with purple sleeve trim", 0.35),
+        upper=_score(upper_top, 0.40, OFFICIAL_POLO_LABEL, 0.35),
         lower=_score("black formal trousers", 0.79, "dark navy trousers", 0.12),
-        feet=_score("black leather loafers", 0.76, "black formal closed shoes", 0.14),
+        feet=_score("leather loafers", 0.76, "formal closed shoes", 0.14),
         chest=_badge(),
     )
 
 
-def test_polo_match_promotes_colored_polo():
+def test_polo_match_promotes_non_formal_shirt():
     result = apply_rules(_polo_regions(), polo_match_score=0.90)
     assert result.score == "100/100"
     assert result.failReasons == []
@@ -180,7 +186,7 @@ def test_polo_match_promotes_colored_polo():
 def test_polo_match_below_threshold_still_zero_upper():
     result = apply_rules(_polo_regions(), polo_match_score=0.70)
     assert result.score == "75/100"
-    assert "non_official_polo" in result.failReasons
+    assert "casual_shirt" in result.failReasons
 
 
 def test_polo_match_skips_low_upper_confidence():
@@ -188,16 +194,16 @@ def test_polo_match_skips_low_upper_confidence():
     assert result.score == "100/100"
 
 
-def test_polo_match_sneakers_still_zero_feet():
+def test_polo_match_sober_sneakers_score_100():
     regions = RegionScores(
-        upper=_score("colored polo shirt", 0.78, "black polo shirt with purple sleeve trim", 0.12),
+        upper=_score(NON_FORMAL_SHIRT_LABEL, 0.78, OFFICIAL_POLO_LABEL, 0.12),
         lower=_score("black formal trousers", 0.79, "dark navy trousers", 0.12),
-        feet=_score("white sneakers", 0.70, "black formal closed shoes", 0.15),
+        feet=_score("single-color sober sneakers", 0.70, "formal closed shoes", 0.15),
         chest=_badge(),
     )
     result = apply_rules(regions, polo_match_score=0.91)
-    assert result.score == "75/100"
-    assert result.failReasons == ["borderline_footwear"]
+    assert result.score == "100/100"
+    assert result.failReasons == []
 
 
 def test_br_missing_id_badge_scores_75():
@@ -248,15 +254,59 @@ def test_om_scores_100_without_chest_crop():
 def test_br_missing_badge_and_sandals_score_50():
     regions = RegionScores(
         upper=_score(
-            "white formal button-down shirt", 0.82, "light blue formal button-down shirt", 0.10
+            "white formal button-down shirt tucked in", 0.82, "light blue formal button-down shirt tucked in", 0.10
         ),
         lower=_score("black formal trousers", 0.79, "dark navy trousers", 0.12),
-        feet=_score("sandals or slides", 0.88, "white sneakers", 0.08),
+        feet=_score("sandals or slides", 0.88, "single-color sober sneakers", 0.08),
         chest=_badge(visible=False),
     )
     result = apply_rules(regions, role=Role.BR)
     assert result.score == "50/100"
     assert result.failReasons == ["open_footwear", "missing_id_badge"]
+
+
+def test_bright_shoes_score_75():
+    regions = RegionScores(
+        upper=_score(
+            "white formal button-down shirt tucked in", 0.82, "light blue formal button-down shirt tucked in", 0.10
+        ),
+        lower=_score("black formal trousers", 0.79, "dark navy trousers", 0.12),
+        feet=_score("brightly colored or neon shoes", 0.73, "single-color sober sneakers", 0.14),
+        chest=_badge(),
+    )
+    result = apply_rules(regions)
+    assert result.score == "75/100"
+    assert result.regionPoints is not None
+    assert result.regionPoints.feet == 0
+    assert result.failReasons == ["bright_color"]
+
+
+def test_near_miss_black_trousers_score_100():
+    regions = RegionScores(
+        upper=_score(
+            "white formal button-down shirt tucked in", 0.82, "light blue formal button-down shirt tucked in", 0.10
+        ),
+        lower=_score("black formal trousers", 0.52, "dark navy trousers", 0.30),
+        feet=_score("leather loafers", 0.76, "formal closed shoes", 0.14),
+        chest=_badge(),
+    )
+    result = apply_rules(regions)
+    assert result.score == "100/100"
+    assert result.failReasons == []
+
+
+def test_pass_footwear_split_skips_margin():
+    regions = RegionScores(
+        upper=_score(
+            "white formal button-down shirt tucked in", 0.82, "light blue formal button-down shirt tucked in", 0.10
+        ),
+        lower=_score("black formal trousers", 0.79, "dark navy trousers", 0.12),
+        feet=_score("single-color sober sneakers", 0.55, "formal closed shoes", 0.48),
+        chest=_badge(),
+    )
+    result = apply_rules(regions)
+    assert result.score == "100/100"
+    assert result.failReasons == []
 
 
 def test_unknown_role_raises():

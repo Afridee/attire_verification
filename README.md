@@ -43,8 +43,8 @@ Flags:
 | `--image PATH` | Required input image |
 | `--pretty` | Pretty-print JSON |
 | `--debug-crops DIR` | Save `upper.jpg` / `lower.jpg` / `feet.jpg` / `chest.jpg` |
-| `--min-confidence F` | Default `0.55` |
-| `--min-margin F` | Default `0.08` (top1 − top2) |
+| `--min-confidence F` | Default `0.50` |
+| `--min-margin F` | Default `0.08` (top1 − top2; skipped when both are allowed items) |
 | `--polo-match-threshold F` | Default `0.85` (cosine vs official polo refs) |
 | `--polo-refs DIR` | Override bundled official-polo upper crops |
 | `--role ROLE` | Staff role (default `BR`). `BR` and `BR_SUP` require a visible ID badge |
@@ -64,6 +64,26 @@ Recursively finds `*.jpg` / `*.jpeg` / `*.png`. Ground truth is inferred from pa
 
 Writes one JSON object per line to `--output` and prints an accuracy summary to stdout.
 
+### Client PDF report
+
+Scores photo folders, writes HTML in a temp directory, converts it to PDF with Chrome, and keeps only the PDF.
+
+```bash
+uv run python scripts/generate_client_report.py
+```
+
+Defaults: `/Users/afridee/Downloads/Photos` and `/Users/afridee/Downloads/BR Attire Verification_Sample Photos`, role `FC` (ID badge not required), output `reports/attire_verification_report.pdf`.
+
+```bash
+uv run python scripts/generate_client_report.py \
+  --dir "/Users/afridee/Downloads/Photos" \
+  --dir "/Users/afridee/Downloads/BR Attire Verification_Sample Photos" \
+  --role FC \
+  --output reports/attire_verification_report.pdf
+```
+
+Requires Google Chrome for the HTML → PDF step.
+
 ## Exit codes (`verify`)
 
 | Code | Meaning |
@@ -73,13 +93,13 @@ Writes one JSON object per line to `--output` and prints an accuracy summary to 
 
 ## Score
 
-Each region is worth **25 points**. A region scores 25 only when it clearly meets dress code; violations, sneakers, low confidence, and missing crops score 0.
+Each region is worth **25 points**. A region scores 25 only when it clearly meets dress code; violations, low confidence, and missing crops score 0.
 
 | Region | Pass (25) | Zero (0) |
 |--------|-----------|----------|
-| **upper** | Formal shirt or official polo (text or ref match ≥ 0.85) | Casual/striped/plaid, non-official polo, low confidence |
-| **lower** | Black or navy trousers | Beige/tan chinos, low confidence |
-| **feet** | Closed shoes or loafers | Sandals, sneakers, low confidence |
+| **upper** | Tucked-in white or light-blue formal shirt, or official polo (text or ref match ≥ 0.85) | Casual or non-formal shirt, low confidence |
+| **lower** | Black or navy trousers | Casual trousers, low confidence |
+| **feet** | Closed shoes, loafers, or single-color sober sneakers | Sandals, bright/neon shoes, low confidence |
 | **chest** | Visible ID badge (`BR` / `BR_SUP`); auto-pass for other roles | Missing badge (BR / BR_SUP), low confidence |
 
 Example: chest, feet, and lower pass but upper fails → `"score": "75/100"`.
