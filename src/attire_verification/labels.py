@@ -5,6 +5,8 @@ OFFICIAL_POLO_LABEL = "black polo shirt with purple sleeve trim"
 NON_FORMAL_SHIRT_LABEL = "casual or non-formal shirt"
 BRIGHT_SHOE_LABEL = "brightly colored or neon shoes"
 CASUAL_TROUSERS_LABEL = "casual trousers"
+GREY_TROUSERS_LABEL = "grey trousers"
+LIGHT_GREY_TROUSERS_LABEL = "light grey trousers"
 
 WHITE_FORMAL_SHIRT_LABEL = "white formal button-down shirt tucked in"
 LIGHT_BLUE_FORMAL_SHIRT_LABEL = "light blue formal button-down shirt tucked in"
@@ -29,8 +31,10 @@ UPPER_LABELS = [
 ]
 
 LOWER_LABELS = [
-    "black formal trousers",
+    "black trousers",
     "dark navy trousers",
+    GREY_TROUSERS_LABEL,
+    LIGHT_GREY_TROUSERS_LABEL,
     CASUAL_TROUSERS_LABEL,
 ]
 

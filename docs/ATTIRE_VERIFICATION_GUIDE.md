@@ -60,7 +60,7 @@ Each of **chest**, **feet**, **upper**, and **lower** is worth **25 points**. Th
 |-------|---------|----------------|
 | **0/100** (framing) | Photo unsuitable for verification | Bad framing, no pose, unreadable image (`incomplete_body_in_frame`) |
 | **0–75/100** | One or more regions did not pass | Sandals, casual/non-formal shirt, casual trousers, bright/neon shoes, missing ID badge, low confidence |
-| **100/100** | All four regions passed | Tucked-in formal shirt or official polo + black/navy trousers + closed shoes, loafers, or sober sneakers (+ badge for BR / BR_SUP) |
+| **100/100** | All four regions passed | Tucked-in formal shirt or official polo + black/navy/grey trousers + closed shoes, loafers, or sober sneakers (+ badge for BR / BR_SUP) |
 
 Example: chest, feet, and lower pass but upper fails → `"score": "75/100"`.
 
@@ -205,10 +205,12 @@ Polo labels use **visual descriptions** (not "official company polo"):
 - **black polo shirt with purple sleeve trim** ← official polo (visual) ← pass
 - **casual or non-formal shirt** ← dump-bin fail (t-shirts, unofficial polos, untucked shirts, etc.)
 
-**Lower (3 labels):**
+**Lower (5 labels):**
 
-- black formal trousers
+- black trousers
 - dark navy trousers
+- grey trousers
+- light grey trousers
 - **casual trousers** ← jeans, shorts, chinos, cargo, or other non-formal bottoms
 
 **Feet (5 labels):**
@@ -283,7 +285,7 @@ Staff role strings match the mobile `RoleInfo` constants. Default is `BR`.
 | Region | Pass (25) | Zero (0) |
 |--------|-----------|----------|
 | **Shirt** | Solid-colour formal tucked in (white, light blue, mint, beige, navy, light gray), official polo (text or ref match) | Casual or non-formal shirt, low confidence |
-| **Trousers** | Black formal, dark navy | Casual trousers, low confidence |
+| **Trousers** | Black, dark navy, grey, light grey | Casual trousers, low confidence |
 | **Feet** | Closed shoes, loafers, single-color sober sneakers | Sandals/slides, bright/neon shoes (only if ≥ 0.70), low confidence |
 | **Chest** (BR / BR_SUP only) | Blue lanyard with ID badge visible | No ID badge visible, missing crop, low badge confidence |
 
@@ -381,6 +383,7 @@ def _score(top: str, top_s: float, second: str, second_s: float) -> RegionScore:
 |------|-------|-----|
 | `test_formal_wear_scores_100` | **100/100** | Tucked-in white formal shirt + black trousers + loafers + badge |
 | `test_extra_solid_formal_shirts_score_100` | **100/100** | Mint, beige, navy, or light-gray formal shirt |
+| `test_grey_trousers_score_100` | **100/100** | Grey or light grey trousers |
 | `test_official_polo_visual_label_scores_100` | **100/100** | Black polo with purple trim label wins text scoring |
 | `test_sandals_and_casual_shirt_score_50` | **50/100** | Casual/non-formal shirt + sandals → `casual_shirt` + `open_footwear` |
 | `test_casual_trousers_score_75` | **75/100** | Casual trousers → `wrong_trousers` (lower 0) |
@@ -466,7 +469,7 @@ Pinned to 0.10.21 because newer MediaPipe Tasks builds can abort on macOS Metal.
 | Outcome | When |
 |---------|------|
 | **0 for a region** | Casual/non-formal shirt (no polo ref match), bright/neon shoes (≥ 0.70), sandals, casual trousers, missing ID badge (BR / BR_SUP), low confidence (< 0.40), low margin vs a forbidden label (< 0.08), missing crop |
-| **25 for a region** | Tucked-in formal shirt or official polo (text or ref match ≥ 0.85); black/navy trousers; loafers/closed shoes/sober sneakers; BR / BR_SUP visible ID badge (other roles auto-pass chest) |
+| **25 for a region** | Tucked-in formal shirt or official polo (text or ref match ≥ 0.85); black/navy/grey trousers; loafers/closed shoes/sober sneakers; BR / BR_SUP visible ID badge (other roles auto-pass chest) |
 | **100/100** | All four regions earned 25 |
 | **0/100** (framing) | Pose/framing failed (only from `PoseCropper`) |
 

@@ -98,7 +98,7 @@ Each region is worth **25 points**. A region scores 25 only when it clearly meet
 | Region | Pass (25) | Zero (0) |
 |--------|-----------|----------|
 | **upper** | Tucked-in solid-colour formal shirt (white, light blue, mint, beige, navy, light gray), or official polo (text or ref match ≥ 0.85) | Casual or non-formal shirt, low confidence |
-| **lower** | Black or navy trousers | Casual trousers, low confidence |
+| **lower** | Black, navy, grey, or light grey trousers | Casual trousers, low confidence |
 | **feet** | Closed shoes, loafers, or single-color sober sneakers | Sandals, bright/neon shoes, low confidence |
 | **chest** | Visible ID badge (`BR` / `BR_SUP`); auto-pass for other roles | Missing badge (BR / BR_SUP), low confidence |
 

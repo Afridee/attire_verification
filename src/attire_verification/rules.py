@@ -8,9 +8,11 @@ from attire_verification.labels import (
     BEIGE_FORMAL_SHIRT_LABEL,
     BRIGHT_SHOE_LABEL,
     CASUAL_TROUSERS_LABEL,
+    GREY_TROUSERS_LABEL,
     ID_BADGE_VISIBLE_LABEL,
     LIGHT_BLUE_FORMAL_SHIRT_LABEL,
     LIGHT_GRAY_FORMAL_SHIRT_LABEL,
+    LIGHT_GREY_TROUSERS_LABEL,
     MINT_GREEN_FORMAL_SHIRT_LABEL,
     NAVY_FORMAL_SHIRT_LABEL,
     NO_ID_BADGE_LABEL,
@@ -52,6 +54,8 @@ class ShirtType(str, Enum):
 class TrouserType(str, Enum):
     BLACK_TROUSERS = "BLACK_TROUSERS"
     NAVY_TROUSERS = "NAVY_TROUSERS"
+    GREY_TROUSERS = "GREY_TROUSERS"
+    LIGHT_GREY_TROUSERS = "LIGHT_GREY_TROUSERS"
     CASUAL_TROUSERS = "CASUAL_TROUSERS"
 
 
@@ -75,8 +79,10 @@ SHIRT_LABEL_MAP: dict[str, ShirtType] = {
 }
 
 TROUSER_LABEL_MAP: dict[str, TrouserType] = {
-    "black formal trousers": TrouserType.BLACK_TROUSERS,
+    "black trousers": TrouserType.BLACK_TROUSERS,
     "dark navy trousers": TrouserType.NAVY_TROUSERS,
+    GREY_TROUSERS_LABEL: TrouserType.GREY_TROUSERS,
+    LIGHT_GREY_TROUSERS_LABEL: TrouserType.LIGHT_GREY_TROUSERS,
     CASUAL_TROUSERS_LABEL: TrouserType.CASUAL_TROUSERS,
 }
 
@@ -100,7 +106,12 @@ PASS_SHIRTS = {
     ShirtType.OFFICIAL_POLO,
 }
 
-PASS_TROUSERS = {TrouserType.BLACK_TROUSERS, TrouserType.NAVY_TROUSERS}
+PASS_TROUSERS = {
+    TrouserType.BLACK_TROUSERS,
+    TrouserType.NAVY_TROUSERS,
+    TrouserType.GREY_TROUSERS,
+    TrouserType.LIGHT_GREY_TROUSERS,
+}
 FAIL_TROUSERS = {TrouserType.CASUAL_TROUSERS}
 PASS_FEET = {FootwearType.FORMAL_CLOSED, FootwearType.LOAFERS, FootwearType.SNEAKERS}
 
@@ -156,7 +167,7 @@ def _passes_allowed(
     """Pass when the top label is allowed and the model is sure enough.
 
     Margin is skipped when second place is also allowed (e.g. loafers vs
-    formal shoes, black vs navy trousers) — that split is not a dress-code doubt.
+    formal shoes, black vs navy vs grey trousers) — that split is not a dress-code doubt.
     """
     if kind not in pass_set or score.topScore < min_confidence:
         return False

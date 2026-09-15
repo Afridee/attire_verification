@@ -43,8 +43,8 @@ REGION_META = {
     },
     "lower": {
         "title": "Trousers",
-        "pass": "Black or navy trousers.",
-        "fail": "Casual trousers (not black or navy).",
+        "pass": "Black, navy, grey, or light grey trousers.",
+        "fail": "Casual trousers (not black, navy, grey, or light grey).",
     },
     "feet": {
         "title": "Shoes",
@@ -80,7 +80,7 @@ FAIL_COPY = {
     ),
     "wrong_trousers": (
         "Trousers do not meet dress code",
-        "Casual trousers were detected. Required: black or navy trousers.",
+        "Casual trousers were detected. Required: black, navy, grey, or light grey trousers.",
     ),
     "missing_id_badge": (
         "ID badge not visible",
