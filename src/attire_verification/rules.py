@@ -5,12 +5,18 @@ from __future__ import annotations
 from enum import Enum
 
 from attire_verification.labels import (
+    BEIGE_FORMAL_SHIRT_LABEL,
     BRIGHT_SHOE_LABEL,
     CASUAL_TROUSERS_LABEL,
     ID_BADGE_VISIBLE_LABEL,
+    LIGHT_BLUE_FORMAL_SHIRT_LABEL,
+    LIGHT_GRAY_FORMAL_SHIRT_LABEL,
+    MINT_GREEN_FORMAL_SHIRT_LABEL,
+    NAVY_FORMAL_SHIRT_LABEL,
     NO_ID_BADGE_LABEL,
     NON_FORMAL_SHIRT_LABEL,
     OFFICIAL_POLO_LABEL,
+    WHITE_FORMAL_SHIRT_LABEL,
 )
 from attire_verification.models import (
     REGION_POINTS,
@@ -22,7 +28,7 @@ from attire_verification.models import (
 )
 from attire_verification.roles import Role, parse_role, requires_id_badge
 
-MIN_CONFIDENCE = 0.50
+MIN_CONFIDENCE = 0.40
 MIN_MARGIN = 0.08
 # Weak "bright/neon" shoe guesses are dump-bin labels. Only treat them as a
 # proven colour violation when the model is actually sure.
@@ -35,6 +41,10 @@ POLO_MATCH_THRESHOLD = 0.85
 class ShirtType(str, Enum):
     WHITE_FORMAL = "WHITE_FORMAL"
     LIGHT_BLUE_FORMAL = "LIGHT_BLUE_FORMAL"
+    MINT_GREEN_FORMAL = "MINT_GREEN_FORMAL"
+    BEIGE_FORMAL = "BEIGE_FORMAL"
+    NAVY_FORMAL = "NAVY_FORMAL"
+    LIGHT_GRAY_FORMAL = "LIGHT_GRAY_FORMAL"
     OFFICIAL_POLO = "OFFICIAL_POLO"
     NON_FORMAL = "NON_FORMAL"
 
@@ -54,8 +64,12 @@ class FootwearType(str, Enum):
 
 
 SHIRT_LABEL_MAP: dict[str, ShirtType] = {
-    "white formal button-down shirt tucked in": ShirtType.WHITE_FORMAL,
-    "light blue formal button-down shirt tucked in": ShirtType.LIGHT_BLUE_FORMAL,
+    WHITE_FORMAL_SHIRT_LABEL: ShirtType.WHITE_FORMAL,
+    LIGHT_BLUE_FORMAL_SHIRT_LABEL: ShirtType.LIGHT_BLUE_FORMAL,
+    MINT_GREEN_FORMAL_SHIRT_LABEL: ShirtType.MINT_GREEN_FORMAL,
+    BEIGE_FORMAL_SHIRT_LABEL: ShirtType.BEIGE_FORMAL,
+    NAVY_FORMAL_SHIRT_LABEL: ShirtType.NAVY_FORMAL,
+    LIGHT_GRAY_FORMAL_SHIRT_LABEL: ShirtType.LIGHT_GRAY_FORMAL,
     OFFICIAL_POLO_LABEL: ShirtType.OFFICIAL_POLO,
     NON_FORMAL_SHIRT_LABEL: ShirtType.NON_FORMAL,
 }
@@ -79,6 +93,10 @@ FAIL_SHIRTS = {ShirtType.NON_FORMAL}
 PASS_SHIRTS = {
     ShirtType.WHITE_FORMAL,
     ShirtType.LIGHT_BLUE_FORMAL,
+    ShirtType.MINT_GREEN_FORMAL,
+    ShirtType.BEIGE_FORMAL,
+    ShirtType.NAVY_FORMAL,
+    ShirtType.LIGHT_GRAY_FORMAL,
     ShirtType.OFFICIAL_POLO,
 }
 

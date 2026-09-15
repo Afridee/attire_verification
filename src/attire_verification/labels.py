@@ -6,9 +6,24 @@ NON_FORMAL_SHIRT_LABEL = "casual or non-formal shirt"
 BRIGHT_SHOE_LABEL = "brightly colored or neon shoes"
 CASUAL_TROUSERS_LABEL = "casual trousers"
 
+WHITE_FORMAL_SHIRT_LABEL = "white formal button-down shirt tucked in"
+LIGHT_BLUE_FORMAL_SHIRT_LABEL = "light blue formal button-down shirt tucked in"
+MINT_GREEN_FORMAL_SHIRT_LABEL = "light mint green formal button-down shirt tucked in"
+BEIGE_FORMAL_SHIRT_LABEL = "beige formal button-down shirt tucked in"
+NAVY_FORMAL_SHIRT_LABEL = "navy formal button-down shirt tucked in"
+LIGHT_GRAY_FORMAL_SHIRT_LABEL = "light gray formal button-down shirt tucked in"
+
+FORMAL_SHIRT_LABELS = [
+    WHITE_FORMAL_SHIRT_LABEL,
+    LIGHT_BLUE_FORMAL_SHIRT_LABEL,
+    MINT_GREEN_FORMAL_SHIRT_LABEL,
+    BEIGE_FORMAL_SHIRT_LABEL,
+    NAVY_FORMAL_SHIRT_LABEL,
+    LIGHT_GRAY_FORMAL_SHIRT_LABEL,
+]
+
 UPPER_LABELS = [
-    "white formal button-down shirt tucked in",
-    "light blue formal button-down shirt tucked in",
+    *FORMAL_SHIRT_LABELS,
     OFFICIAL_POLO_LABEL,
     NON_FORMAL_SHIRT_LABEL,
 ]

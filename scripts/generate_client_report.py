@@ -38,8 +38,8 @@ CHROME = Path("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome")
 REGION_META = {
     "upper": {
         "title": "Shirt / top",
-        "pass": "Tucked-in white or light-blue formal shirt, or the official black polo with purple sleeve trim.",
-        "fail": "Anything other than a tucked-in white/light-blue formal shirt or the official polo.",
+        "pass": "Tucked-in solid-colour formal shirt (white, light blue, mint, beige, navy, or light gray), or the official black polo with purple sleeve trim.",
+        "fail": "Anything other than a tucked-in solid-colour formal shirt or the official polo.",
     },
     "lower": {
         "title": "Trousers",
@@ -66,8 +66,9 @@ FAIL_COPY = {
     ),
     "casual_shirt": (
         "Shirt does not meet dress code",
-        "The shirt is casual or non-formal. Required: a tucked-in white or light-blue "
-        "formal shirt, or the official black polo with purple sleeve trim.",
+        "The shirt is casual or non-formal. Required: a tucked-in solid-colour "
+        "formal shirt (white, light blue, mint, beige, navy, or light gray), "
+        "or the official black polo with purple sleeve trim.",
     ),
     "bright_color": (
         "Bright or neon colour",

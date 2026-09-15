@@ -43,7 +43,7 @@ Flags:
 | `--image PATH` | Required input image |
 | `--pretty` | Pretty-print JSON |
 | `--debug-crops DIR` | Save `upper.jpg` / `lower.jpg` / `feet.jpg` / `chest.jpg` |
-| `--min-confidence F` | Default `0.50` |
+| `--min-confidence F` | Default `0.40` |
 | `--min-margin F` | Default `0.08` (top1 − top2; skipped when both are allowed items) |
 | `--polo-match-threshold F` | Default `0.85` (cosine vs official polo refs) |
 | `--polo-refs DIR` | Override bundled official-polo upper crops |
@@ -97,7 +97,7 @@ Each region is worth **25 points**. A region scores 25 only when it clearly meet
 
 | Region | Pass (25) | Zero (0) |
 |--------|-----------|----------|
-| **upper** | Tucked-in white or light-blue formal shirt, or official polo (text or ref match ≥ 0.85) | Casual or non-formal shirt, low confidence |
+| **upper** | Tucked-in solid-colour formal shirt (white, light blue, mint, beige, navy, light gray), or official polo (text or ref match ≥ 0.85) | Casual or non-formal shirt, low confidence |
 | **lower** | Black or navy trousers | Casual trousers, low confidence |
 | **feet** | Closed shoes, loafers, or single-color sober sneakers | Sandals, bright/neon shoes, low confidence |
 | **chest** | Visible ID badge (`BR` / `BR_SUP`); auto-pass for other roles | Missing badge (BR / BR_SUP), low confidence |
