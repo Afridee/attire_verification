@@ -2,11 +2,13 @@
 
 Offline eval CLI that checks full-body BR attire photos:
 
-1. MediaPipe Pose framing gate (visible nose + ankles, min person pixel height) + person-centric upper / lower / feet / chest crops  
-2. Marqo FashionSigLIP zero-shot scoring per crop, plus image-to-image match of the upper crop against official black-polo reference photos  
+1. MediaPipe Pose framing gate (visible nose + ankles, min person pixel height) + person-centric upper / lower / feet / chest crops
+2. Marqo FashionSigLIP zero-shot scoring per crop, plus image-to-image match of the upper crop against official black-polo reference photos
 3. Unified dress-code rule engine → score `N/100` (25 points each for chest, feet, upper, lower)
 
 Not a production API — local eval only.
+
+Internals: [docs/ATTIRE_VERIFICATION_GUIDE.md](docs/ATTIRE_VERIFICATION_GUIDE.md).
 
 ## Setup
 
@@ -49,6 +51,17 @@ Flags:
 | `--polo-refs DIR` | Override bundled official-polo upper crops |
 | `--role ROLE` | Staff role (default `BR`). `BR` and `BR_SUP` require a visible ID badge |
 
+JSON includes `score`, `failReasons`, `regions`, `regionPoints` (each region `0` or `25`), `role` (also set on framing rejects), and `poloMatch` when scoring completes:
+
+```json
+"poloMatch": {
+  "score": 0.9012,
+  "threshold": 0.85,
+  "matched": true,
+  "refs": 2
+}
+```
+
 ### Batch folder eval
 
 ```bash
@@ -62,7 +75,11 @@ Recursively finds `*.jpg` / `*.jpeg` / `*.png`. Ground truth is inferred from pa
 - `Right Attire` → expected `100/100`
 - `Wrong Attire` → expected `<100`
 
-Writes one JSON object per line to `--output` and prints an accuracy summary to stdout.
+Each JSONL line is a verify result plus `expected` and `match`. Framing rejects (`incomplete_body_in_frame`) count as `rejected`, not scored.
+
+Shared flags: `--min-confidence`, `--min-margin`, `--polo-match-threshold`, `--polo-refs`, and `--role` (one role for every image).
+
+Stdout prints `total`, `scored`, `correct`, `accuracy`, `falsePass`, `falseFail`, `rejected`, and `output`.
 
 ### Client PDF report
 
@@ -82,7 +99,7 @@ uv run python scripts/generate_client_report.py \
   --output reports/attire_verification_report.pdf
 ```
 
-Requires Google Chrome for the HTML → PDF step.
+Requires Google Chrome for the HTML → PDF step. `--dir` can be repeated.
 
 ## Exit codes (`verify`)
 
@@ -99,7 +116,7 @@ Each region is worth **25 points**. A region scores 25 only when it clearly meet
 |--------|-----------|----------|
 | **upper** | Tucked-in solid-colour formal shirt (white, light blue, mint, beige, navy, light gray), or official polo (text or ref match ≥ 0.85) | Casual or non-formal shirt, low confidence |
 | **lower** | Black, navy, grey, or light grey trousers | Casual trousers, low confidence |
-| **feet** | Closed shoes, loafers, or single-color sober sneakers | Sandals, bright/neon shoes, low confidence |
+| **feet** | Closed shoes, loafers, or single-color sober sneakers | Sandals; bright/neon shoes when confidence ≥ `0.70` and margin ≥ `0.08` (weaker neon guesses are ignored); low confidence |
 | **chest** | Visible ID badge (`BR` / `BR_SUP`); auto-pass for other roles | Missing badge (BR / BR_SUP), low confidence |
 
 Example: chest, feet, and lower pass but upper fails → `"score": "75/100"`.
@@ -125,7 +142,7 @@ uv run python -m attire_verification verify \
 
 ## Tests
 
-Rule-engine unit tests (no GPU / MediaPipe):
+No GPU / MediaPipe. Covers the rule engine (`tests/test_rules.py`), role parsing and ID-badge rules (`tests/test_roles.py`), and framing / crop-prep helpers (`tests/test_pose_framing.py`).
 
 ```bash
 uv run pytest
