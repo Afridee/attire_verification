@@ -10,7 +10,13 @@ import mediapipe as mp
 import numpy as np
 from PIL import Image
 
-from attire_verification.models import CropBox, PoseInfo, Status, VerifyResult
+from attire_verification.models import (
+    ZERO_SCORE,
+    CropBox,
+    PoseInfo,
+    RegionPoints,
+    VerifyResult,
+)
 
 # MediaPipe Pose landmark indices
 NOSE = 0
@@ -206,10 +212,11 @@ class PoseCropper:
         bgr = cv2.imread(str(path))
         if bgr is None:
             return VerifyResult(
-                status=Status.REJECTED,
+                score=ZERO_SCORE,
                 failReasons=["incomplete_body_in_frame"],
                 imagePath=str(path),
                 regions=None,
+                regionPoints=RegionPoints(),
                 pose=PoseInfo(
                     fullBodyOk=False,
                     landmarksDetected=0,
@@ -223,20 +230,22 @@ class PoseCropper:
 
         if lms is None:
             return VerifyResult(
-                status=Status.REJECTED,
+                score=ZERO_SCORE,
                 failReasons=["incomplete_body_in_frame"],
                 imagePath=str(path),
                 regions=None,
+                regionPoints=RegionPoints(),
                 pose=PoseInfo(fullBodyOk=False, landmarksDetected=0),
             )
 
         framing_ok, framing_details = evaluate_framing(lms, orig_w, orig_h)
         if not framing_ok:
             return VerifyResult(
-                status=Status.REJECTED,
+                score=ZERO_SCORE,
                 failReasons=["incomplete_body_in_frame"],
                 imagePath=str(path),
                 regions=None,
+                regionPoints=RegionPoints(),
                 pose=PoseInfo(
                     fullBodyOk=False,
                     landmarksDetected=len(lms),
@@ -248,10 +257,11 @@ class PoseCropper:
         pbox = person_crop_box(lms, orig_w, orig_h)
         if pbox is None:
             return VerifyResult(
-                status=Status.REJECTED,
+                score=ZERO_SCORE,
                 failReasons=["incomplete_body_in_frame"],
                 imagePath=str(path),
                 regions=None,
+                regionPoints=RegionPoints(),
                 pose=PoseInfo(
                     fullBodyOk=False,
                     landmarksDetected=len(lms),
