@@ -131,13 +131,27 @@ def outcome(result: VerifyResult) -> str:
     return "fail"
 
 
+def _placeholder_preview_jpeg(max_side: int = 900) -> bytes:
+    side = min(320, max_side)
+    im = Image.new("RGB", (side, side), (220, 220, 220))
+    buf = BytesIO()
+    im.save(buf, "JPEG", quality=85, optimize=True)
+    return buf.getvalue()
+
+
 def preview_jpeg(src: Path, max_side: int = 900) -> bytes:
-    with Image.open(src) as im:
-        im = im.convert("RGB")
-        im.thumbnail((max_side, max_side), Image.Resampling.LANCZOS)
-        buf = BytesIO()
-        im.save(buf, "JPEG", quality=85, optimize=True)
-        return buf.getvalue()
+    try:
+        if src.stat().st_size == 0:
+            raise OSError("empty file")
+        with Image.open(src) as im:
+            im = im.convert("RGB")
+            im.thumbnail((max_side, max_side), Image.Resampling.LANCZOS)
+            buf = BytesIO()
+            im.save(buf, "JPEG", quality=85, optimize=True)
+            return buf.getvalue()
+    except (OSError, Image.UnidentifiedImageError) as exc:
+        print(f"Warning: no preview for {src} ({exc})", flush=True)
+        return _placeholder_preview_jpeg(max_side)
 
 
 def data_uri_jpeg(data: bytes) -> str:
