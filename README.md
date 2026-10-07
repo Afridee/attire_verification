@@ -6,7 +6,7 @@ Offline eval CLI that checks full-body BR attire photos:
 2. Marqo FashionSigLIP zero-shot scoring per crop, plus image-to-image match of the upper crop against official black-polo reference photos
 3. Unified dress-code rule engine → score `N/100` (25 points each for chest, feet, upper, lower)
 
-Not a production API — local eval only.
+The CLI is for local eval. `POST /verify` is the same pipeline, exposed so a Nest backend can call it.
 
 Internals: [docs/ATTIRE_VERIFICATION_GUIDE.md](docs/ATTIRE_VERIFICATION_GUIDE.md).
 
@@ -100,6 +100,38 @@ uv run python scripts/generate_client_report.py \
 ```
 
 Requires Google Chrome for the HTML → PDF step. `--dir` can be repeated.
+
+## HTTP API
+
+Same check as `verify`, for Nest (or any other caller).
+
+```bash
+uv run python -m uvicorn attire_verification.api:app --host 0.0.0.0 --port 8000
+```
+
+```bash
+curl -s -X POST http://localhost:8000/verify \
+  -H "X-API-Key: $SERVICE_API_KEY" \
+  -F "image=@/path/to/photo.jpg" \
+  -F "role=BR"
+```
+
+| Call | Behavior |
+|------|----------|
+| `POST /verify` | Multipart `image` (JPEG or PNG, max 25MB) and `role` (default `BR`) |
+| `GET /health` | Liveness, no auth |
+| `X-API-Key` | Required only when `SERVICE_API_KEY` is set. Nest should send the same value |
+
+The JSON body matches the CLI: `score`, `failReasons`, `regions`, `regionPoints`, `role`, `poloMatch`. Models load once at startup and inference runs one photo at a time.
+
+Docker (CPU image, weights baked in at build):
+
+```bash
+DOCKER_BUILDKIT=1 docker build -t attire-verification .
+docker run -p 8000:8000 -e SERVICE_API_KEY=... attire-verification
+```
+
+`GET /docs` is the OpenAPI page.
 
 ## Exit codes (`verify`)
 

@@ -37,6 +37,8 @@ uv run python -m attire_verification verify \
 
 The `--debug-crops` flag saves `upper.jpg`, `lower.jpg`, `feet.jpg`, and `chest.jpg` for inspection.
 
+The same pipeline is available over HTTP for the Nest backend: `POST /verify` with a multipart `image` and `role`. See the HTTP API section in the README.
+
 ### `verify` flags
 
 | Flag | Default | Description |

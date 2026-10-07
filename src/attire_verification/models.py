@@ -80,3 +80,15 @@ class VerifyResult(BaseModel):
     role: str | None = None
     expected: str | None = None  # batch mode only
     match: bool | None = None  # batch mode only
+
+    def public_dict(self) -> dict[str, Any]:
+        """JSON payload shared by the CLI and the HTTP API.
+
+        Drops batch-only and unused optional fields so a single-image response
+        does not include nulls for ``expected``, ``match``, and the like.
+        """
+        data = self.model_dump(mode="json", exclude_none=False)
+        for key in ("expected", "match", "poloMatch", "role", "regionPoints"):
+            if data.get(key) is None:
+                data.pop(key, None)
+        return data

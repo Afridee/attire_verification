@@ -116,18 +116,7 @@ def run_verify(
 
 
 def _print_result(result: VerifyResult, pretty: bool) -> None:
-    data = result.model_dump(mode="json", exclude_none=False)
-    # Drop batch-only fields when unused
-    if data.get("expected") is None:
-        data.pop("expected", None)
-    if data.get("match") is None:
-        data.pop("match", None)
-    if data.get("poloMatch") is None:
-        data.pop("poloMatch", None)
-    if data.get("role") is None:
-        data.pop("role", None)
-    if data.get("regionPoints") is None:
-        data.pop("regionPoints", None)
+    data = result.public_dict()
     if pretty:
         typer.echo(json.dumps(data, indent=2))
     else:
