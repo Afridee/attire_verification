@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+# Before torch. OpenMP reads OMP_NUM_THREADS on the first native import.
+from attire_verification.cpu_threads import configure_cpu_threads, resolve_num_threads
+
+configure_cpu_threads()
+
 import os
 from pathlib import Path
 
@@ -76,10 +81,22 @@ def iter_polo_ref_images(ref_dir: Path) -> list[Path]:
     )
 
 
+def _apply_torch_thread_limit() -> None:
+    """Intra-op and inter-op pools. Inter-op throws once parallel work has started."""
+    count = resolve_num_threads()
+    torch.set_num_threads(count)
+    try:
+        torch.set_num_interop_threads(count)
+    except RuntimeError as exc:
+        if "cannot set number of interop threads" not in str(exc):
+            raise
+
+
 class FashionSigLIPScorer:
     """Lazy-loaded FashionSigLIP scorer with cached text embeddings."""
 
     def __init__(self, polo_refs: Path | None = None) -> None:
+        _apply_torch_thread_limit()
         import open_clip
 
         _load_hf_token()

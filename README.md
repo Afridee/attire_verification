@@ -122,7 +122,7 @@ curl -s -X POST http://localhost:8000/verify \
 | `GET /health` | Liveness, no auth |
 | `X-API-Key` | Required only when `SERVICE_API_KEY` is set. Nest should send the same value |
 
-The JSON body matches the CLI: `score`, `failReasons`, `regions`, `regionPoints`, `role`, `poloMatch`. Models load once at startup and inference runs one photo at a time.
+The JSON body matches the CLI: `score`, `failReasons`, `regions`, `regionPoints`, `role`, `poloMatch`. Models load once at startup and inference runs one photo at a time. Inference defaults to 1 CPU thread. Set `ATTIRE_NUM_THREADS` to a positive integer to override that. On this class of CPU, one image is then about 6 seconds instead of about 1.7 seconds when PyTorch used 4 threads.
 
 Docker (CPU image, weights baked in at build):
 

@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+# Before pose_cropper (cv2, MediaPipe) and siglip_scorer (torch).
+from attire_verification.cpu_threads import configure_cpu_threads
+
+configure_cpu_threads()
+
 import json
 from pathlib import Path
 from typing import Optional

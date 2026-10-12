@@ -9,6 +9,7 @@ services:
     environment:
       SERVICE_API_KEY: ${SERVICE_API_KEY:-}
       ATTIRE_WARMUP: "1"
+      ATTIRE_NUM_THREADS: "1"
     healthcheck:
       test:
         [

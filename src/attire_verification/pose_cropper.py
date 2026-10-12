@@ -10,6 +10,7 @@ import mediapipe as mp
 import numpy as np
 from PIL import Image
 
+from attire_verification.cpu_threads import resolve_num_threads
 from attire_verification.models import (
     ZERO_SCORE,
     CropBox,
@@ -190,6 +191,7 @@ class PoseCropper:
     """Detect pose landmarks and crop upper / lower / feet / chest regions."""
 
     def __init__(self) -> None:
+        cv2.setNumThreads(resolve_num_threads())
         # Classic solutions API — more reliable on macOS than Tasks+Metal.
         self._pose = mp.solutions.pose.Pose(
             static_image_mode=True,

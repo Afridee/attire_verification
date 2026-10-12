@@ -18,6 +18,12 @@ serialized: one photo is in the model at a time.
 
 from __future__ import annotations
 
+# Before cli, which imports MediaPipe and torch. OpenMP latches its thread
+# count on that first native import.
+from attire_verification.cpu_threads import configure_cpu_threads
+
+configure_cpu_threads()
+
 import logging
 import os
 import tempfile
